@@ -507,6 +507,87 @@ export class ResidentService {
     return { success: true };
   }
 
+  async reportVehicleStillParked(sharingId: string, ownerId: string) {
+    const { rows: [entry] } = await query('SELECT * FROM sharing_entries WHERE id=$1', [sharingId]);
+    if (!entry) throw new NotFoundException('Entry not found');
+    if (entry.user_id !== ownerId) throw new BadRequestException('Only the space owner can report');
+    if (entry.status !== 'confirmed') throw new BadRequestException('Reservation not active');
+
+    const borrowerId = entry.requested_by_user_id;
+    if (!borrowerId) throw new BadRequestException('No borrower to notify');
+
+    const { rows: [owner] } = await query('SELECT first_name, last_name FROM residents WHERE id=$1', [ownerId]);
+    const ownerName = `${owner.first_name} ${owner.last_name[0]}.`;
+
+    const id = `notif_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    await query(
+      `INSERT INTO notifications (id, user_id, type, title, body, space_code, related_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [id, borrowerId, 'vehicle_report',
+       '🚨 Zgłoszenie: pojazd nadal na miejscu!',
+       `Właściciel miejsca ${entry.space_code} (${ownerName}) zgłasza, że Twój pojazd nadal stoi na jego miejscu parkingowym. Proszę o jak najszybsze opuszczenie miejsca.`,
+       entry.space_code, sharingId]
+    );
+
+    return { success: true };
+  }
+
+  async getArchive(userId: string) {
+    const { rows: sharingRows } = await query(`
+      SELECT se.*, r.first_name AS owner_first, r.last_name AS owner_last,
+             br.first_name AS borrower_first, br.last_name AS borrower_last, br.plate_number AS borrower_plate
+      FROM sharing_entries se
+      JOIN residents r ON r.id = se.user_id
+      LEFT JOIN residents br ON br.id = se.requested_by_user_id
+      WHERE (se.user_id = $1 OR se.requested_by_user_id = $1)
+        AND (se.status = 'completed' OR (se.status = 'confirmed' AND se.vacated_at IS NOT NULL)
+             OR (se.date_to < NOW() AND se.status IN ('available', 'confirmed', 'completed')))
+      ORDER BY se.date_to DESC
+      LIMIT 100
+    `, [userId]);
+
+    const { rows: seekingRows } = await query(`
+      SELECT se.*, r.first_name, r.last_name
+      FROM seeking_entries se
+      JOIN residents r ON r.id = se.user_id
+      WHERE se.user_id = $1
+        AND (se.status = 'matched' OR se.date_to < NOW())
+      ORDER BY se.date_to DESC
+      LIMIT 100
+    `, [userId]);
+
+    return {
+      sharing: sharingRows.map((r: any) => ({
+        id: r.id,
+        spaceCode: r.space_code,
+        parkingType: r.parking_type,
+        stage: r.stage,
+        dateFrom: r.date_from,
+        dateTo: r.date_to,
+        status: r.status,
+        ownerName: `${r.owner_first} ${r.owner_last}`,
+        ownerId: r.user_id,
+        borrowerName: r.borrower_first ? `${r.borrower_first} ${r.borrower_last}` : null,
+        borrowerId: r.requested_by_user_id,
+        borrowerPlate: r.borrower_plate,
+        vacatedAt: r.vacated_at,
+        postedAt: r.posted_at,
+        role: r.user_id === userId ? 'owner' : 'borrower',
+      })),
+      seeking: seekingRows.map((r: any) => ({
+        id: r.id,
+        stage: r.stage,
+        dateFrom: r.date_from,
+        dateTo: r.date_to,
+        status: r.status,
+        matchedSpaceCode: r.matched_space_code,
+        matchedParkingType: r.matched_parking_type,
+        seekerName: `${r.first_name} ${r.last_name}`,
+        postedAt: r.posted_at,
+      })),
+    };
+  }
+
   private async getResident(id: string) {
     const { rows } = await query('SELECT * FROM residents WHERE id=$1', [id]);
     if (rows.length === 0) throw new NotFoundException('Resident not found');

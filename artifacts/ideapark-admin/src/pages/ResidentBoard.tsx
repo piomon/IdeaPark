@@ -7,7 +7,7 @@ import { residentApi, setAuthToken, getAuthToken, clearAuth } from '../lib/resid
 const STAGES = ['Idea', 'Ogrody', 'Alfa', 'Omega', 'Leo', 'Venus', 'Orion', 'Aurora'] as const;
 type Stage = typeof STAGES[number];
 type ParkingType = 'naziemne' | 'podziemne';
-type AppScreen = 'home' | 'board' | 'add' | 'notifications' | 'profile' | 'settings' | 'messages' | 'chat' | 'regulations';
+type AppScreen = 'home' | 'board' | 'add' | 'notifications' | 'profile' | 'settings' | 'messages' | 'chat' | 'regulations' | 'archive';
 type BoardTab = 'sharing' | 'seeking';
 type StageFilter = Stage | 'all';
 
@@ -354,6 +354,15 @@ function MainApp({ user, onLogout, lang, setLang, theme, setTheme }: {
   const [typeFilter, setTypeFilter] = useState<'all' | ParkingType>('all');
   const [showFilters, setShowFilters] = useState(false);
 
+  const [archiveData, setArchiveData] = useState<{ sharing: any[]; seeking: any[] }>({ sharing: [], seeking: [] });
+  const [archiveTab, setArchiveTab] = useState<'sharing' | 'seeking'>('sharing');
+  const [archiveLoading, setArchiveLoading] = useState(false);
+  const loadArchive = useCallback(async () => {
+    setArchiveLoading(true);
+    try { const data = await residentApi.getArchive(); setArchiveData(data); } catch {}
+    setArchiveLoading(false);
+  }, []);
+
   const WIDGETS_KEY = 'ideapark_home_widgets';
   const defaultWidgets: HomeWidget[] = [
     { id: 'spaceCard', label: T.showSpaceCard, enabled: true },
@@ -398,6 +407,11 @@ function MainApp({ user, onLogout, lang, setLang, theme, setTheme }: {
   useEffect(() => { touchSession(); }, [screen]);
 
   const showToast = useCallback((msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3500); }, []);
+
+  const handleReportVehicle = useCallback(async (sharingId: string) => {
+    if (!confirm(T.reportVehicleConfirm)) return;
+    try { await residentApi.reportVehicle(sharingId); showToast(T.reportVehicleSent); } catch (e: any) { showToast(e.message || 'Error'); }
+  }, [T, showToast]);
   const addNotif = useCallback(async (n: Omit<NotificationItem, 'id' | 'createdAt' | 'read'>) => {
     try {
       await residentApi.addNotification({ type: n.type, title: n.title, body: n.body, spaceCode: n.spaceCode, relatedId: n.relatedId });
@@ -711,6 +725,11 @@ function MainApp({ user, onLogout, lang, setLang, theme, setTheme }: {
             <button className="confirm-btn" style={{background: 'var(--red, #e74c3c)'}} onClick={() => handleConfirmVacated(vacateModal.sharingId)}>
               {T.confirmVacatedBtn}
             </button>
+            {vacateModal.role === 'owner' && (
+              <button className="confirm-btn" style={{background: 'var(--orange, #f59e0b)', marginTop: '8px'}} onClick={() => { handleReportVehicle(vacateModal.sharingId); }}>
+                🚨 {T.reportVehicle}
+              </button>
+            )}
             <button className="confirm-btn" style={{background: 'transparent', color: 'var(--text2)', border: '1px solid var(--border)', marginTop: '8px'}} onClick={() => setVacateModal(null)}>
               {T.back}
             </button>
@@ -1083,10 +1102,55 @@ function MainApp({ user, onLogout, lang, setLang, theme, setTheme }: {
         );
       })()}
 
+      {screen === 'archive' && (
+        <div className="screen">
+          <div className="screen-topbar"><button className="topbar-back" onClick={() => setScreen('profile')}>{T.back}</button><h1 className="topbar-title">{T.archive}</h1><div /></div>
+          <div className="board-tabs" style={{marginBottom: 16}}>
+            <button className={`bt-tab ${archiveTab === 'sharing' ? 'bt-active' : ''}`} onClick={() => setArchiveTab('sharing')}>🅿️ {T.archiveSharing}</button>
+            <button className={`bt-tab ${archiveTab === 'seeking' ? 'bt-active' : ''}`} onClick={() => setArchiveTab('seeking')}>🔍 {T.archiveSeeking}</button>
+          </div>
+          {archiveLoading ? <div className="empty-msg">...</div> : archiveTab === 'sharing' ? (
+            archiveData.sharing.length === 0 ? <div className="empty-msg">{T.noArchiveSharing}</div> :
+            archiveData.sharing.map((s: any) => (
+              <div key={s.id} className="archive-card">
+                <div className="archive-header">
+                  <span className="archive-space">{s.spaceCode}</span>
+                  <span className={`archive-status ${s.status === 'completed' ? 'as-completed' : 'as-expired'}`}>
+                    {s.status === 'completed' ? `✅ ${T.archiveCompleted}` : `⏰ ${T.archiveExpired}`}
+                  </span>
+                </div>
+                <div className="archive-dates">{formatDateTime(s.dateFrom, lang)} → {formatDateTime(s.dateTo, lang)}</div>
+                <div className="archive-details">
+                  <span>{T.archiveRole}: <strong>{s.role === 'owner' ? T.archiveOwner : T.archiveBorrower}</strong></span>
+                  <span>{T.stage} {s.stage} · {parkingShort(s.parkingType, lang)}</span>
+                </div>
+                {s.borrowerName && <div className="archive-person">{s.role === 'owner' ? T.archiveBorrower : T.archiveOwner}: {s.role === 'owner' ? s.borrowerName : s.ownerName}</div>}
+                {s.vacatedAt && <div className="archive-vacated">✅ {T.vacatedConfirmed}: {formatDateTime(s.vacatedAt, lang)}</div>}
+              </div>
+            ))
+          ) : (
+            archiveData.seeking.length === 0 ? <div className="empty-msg">{T.noArchiveSeeking}</div> :
+            archiveData.seeking.map((s: any) => (
+              <div key={s.id} className="archive-card">
+                <div className="archive-header">
+                  <span className="archive-space">{T.stage} {s.stage}</span>
+                  <span className={`archive-status ${s.status === 'matched' ? 'as-completed' : 'as-expired'}`}>
+                    {s.status === 'matched' ? `✅ ${T.archiveMatched}` : `⏰ ${T.archiveNotMatched}`}
+                  </span>
+                </div>
+                <div className="archive-dates">{formatDateTime(s.dateFrom, lang)} → {formatDateTime(s.dateTo, lang)}</div>
+                {s.matchedSpaceCode && <div className="archive-person">{T.matched}: {s.matchedSpaceCode} ({parkingShort(s.matchedParkingType, lang)})</div>}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
       <nav className="bottom-nav">
         <button className={`bn-btn ${screen === 'home' ? 'bn-active' : ''}`} onClick={() => setScreen('home')}><span className="bn-icon">🏠</span><span className="bn-label">{T.home}</span></button>
         <button className={`bn-btn ${screen === 'board' ? 'bn-active' : ''}`} onClick={() => setScreen('board')}><span className="bn-icon">🅿️</span><span className="bn-label">{T.boardNav}</span></button>
         <button className={`bn-btn bn-add ${screen === 'add' ? 'bn-active' : ''}`} onClick={() => setScreen('add')}><span className="bn-icon-add">+</span></button>
+        <button className={`bn-btn ${screen === 'archive' ? 'bn-active' : ''}`} onClick={() => { setScreen('archive'); loadArchive(); }}><span className="bn-icon">📁</span><span className="bn-label">{T.archiveNav}</span></button>
         <button className={`bn-btn ${screen === 'messages' || screen === 'chat' ? 'bn-active' : ''}`} onClick={() => setScreen('messages')}><span className="bn-icon">💬</span><span className="bn-label">{T.messagesNav}</span>{unreadMsgCount > 0 && <span className="bn-badge">{unreadMsgCount}</span>}</button>
         <button className={`bn-btn ${screen === 'profile' || screen === 'notifications' || screen === 'settings' ? 'bn-active' : ''}`} onClick={() => setScreen('profile')}><span className="bn-icon">👤</span><span className="bn-label">{T.profileNav}</span>{unreadCount > 0 && <span className="bn-badge">{unreadCount}</span>}</button>
       </nav>

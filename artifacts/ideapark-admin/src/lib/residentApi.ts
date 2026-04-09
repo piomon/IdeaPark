@@ -122,4 +122,9 @@ export const residentApi = {
     request(`/sharing/${sharingId}/confirm-vacated`, { method: 'POST', body: JSON.stringify({}) }),
 
   getActiveReservations: () => request('/active-reservations'),
+
+  reportVehicle: (sharingId: string) =>
+    request(`/sharing/${sharingId}/report-vehicle`, { method: 'POST', body: JSON.stringify({}) }),
+
+  getArchive: () => request('/archive'),
 };

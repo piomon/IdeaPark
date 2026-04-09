@@ -161,4 +161,16 @@ export class ResidentController {
     const user = req.user as JwtPayload;
     return this.svc.markNotificationsRead(user.userId);
   }
+
+  @Post('sharing/:id/report-vehicle')
+  async reportVehicle(@Param('id') id: string, @Req() req: Request) {
+    const user = req.user as JwtPayload;
+    return this.svc.reportVehicleStillParked(id, user.userId);
+  }
+
+  @Get('archive')
+  async getArchive(@Req() req: Request) {
+    const user = req.user as JwtPayload;
+    return this.svc.getArchive(user.userId);
+  }
 }
