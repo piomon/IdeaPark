@@ -72,6 +72,18 @@ export const residentApi = {
   addSeeking: (from: string, to: string) =>
     request('/seeking', { method: 'POST', body: JSON.stringify({ from, to }) }),
 
+  deleteSharing: (sharingId: string) =>
+    request(`/sharing/${sharingId}`, { method: 'DELETE' }),
+
+  editSharing: (sharingId: string, from: string, to: string) =>
+    request(`/sharing/${sharingId}`, { method: 'PUT', body: JSON.stringify({ from, to }) }),
+
+  deleteSeeking: (seekingId: string) =>
+    request(`/seeking/${seekingId}`, { method: 'DELETE' }),
+
+  editSeeking: (seekingId: string, from: string, to: string) =>
+    request(`/seeking/${seekingId}`, { method: 'PUT', body: JSON.stringify({ from, to }) }),
+
   requestSpace: (sharingId: string) =>
     request(`/sharing/${sharingId}/request`, { method: 'POST', body: JSON.stringify({}) }),
 

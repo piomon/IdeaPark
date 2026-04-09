@@ -169,6 +169,16 @@ export async function initDatabase() {
   console.log('Database schema initialized');
 }
 
+export async function clearAnnouncements() {
+  await query('DELETE FROM chat_messages');
+  await query('DELETE FROM chat_threads');
+  await query('DELETE FROM proposals');
+  await query('DELETE FROM notifications');
+  await query('DELETE FROM seeking_entries');
+  await query('DELETE FROM sharing_entries');
+  console.log('Announcements cleared on startup');
+}
+
 export async function seedDemoData() {
   const { rows } = await query('SELECT COUNT(*) as cnt FROM residents');
   if (parseInt(rows[0].cnt, 10) > 0) {

@@ -234,6 +234,73 @@ export class ResidentService {
     return { id };
   }
 
+  async deleteSharing(sharingId: string, userId: string) {
+    const { rows: [entry] } = await query('SELECT * FROM sharing_entries WHERE id=$1', [sharingId]);
+    if (!entry) throw new NotFoundException('Listing not found');
+    if (entry.user_id !== userId) throw new BadRequestException('Only the owner can delete this listing');
+    if (entry.status !== 'available') throw new BadRequestException('Cannot delete listing that is already reserved or pending');
+    await query('DELETE FROM sharing_entries WHERE id=$1', [sharingId]);
+    return { success: true };
+  }
+
+  async editSharing(sharingId: string, userId: string, from: string, to: string) {
+    const { rows: [entry] } = await query('SELECT * FROM sharing_entries WHERE id=$1', [sharingId]);
+    if (!entry) throw new NotFoundException('Listing not found');
+    if (entry.user_id !== userId) throw new BadRequestException('Only the owner can edit this listing');
+    if (entry.status !== 'available') throw new BadRequestException('Cannot edit listing that is already reserved or pending');
+
+    const dateFrom = new Date(from);
+    const dateTo = new Date(to);
+    if (isNaN(dateFrom.getTime()) || isNaN(dateTo.getTime())) throw new BadRequestException('Invalid date format');
+    if (dateTo <= dateFrom) throw new BadRequestException('End time must be after start time');
+
+    const { rows: overlap } = await query(`
+      SELECT id FROM sharing_entries
+      WHERE user_id=$1 AND id!=$4 AND status IN ('available','pending','confirmed')
+        AND date_from < $3 AND date_to > $2
+    `, [userId, dateFrom.toISOString(), dateTo.toISOString(), sharingId]);
+    if (overlap.length > 0) throw new ConflictException('Overlapping dates');
+
+    await query('UPDATE sharing_entries SET date_from=$1, date_to=$2 WHERE id=$3', [dateFrom.toISOString(), dateTo.toISOString(), sharingId]);
+    return { success: true };
+  }
+
+  async deleteSeeking(seekingId: string, userId: string) {
+    const { rows: [entry] } = await query('SELECT * FROM seeking_entries WHERE id=$1', [seekingId]);
+    if (!entry) throw new NotFoundException('Listing not found');
+    if (entry.user_id !== userId) throw new BadRequestException('Only the owner can delete this listing');
+    if (entry.status === 'matched') throw new BadRequestException('Cannot delete matched listing');
+    await query('DELETE FROM proposals WHERE seeking_id=$1', [seekingId]);
+    await query('DELETE FROM seeking_entries WHERE id=$1', [seekingId]);
+    return { success: true };
+  }
+
+  async editSeeking(seekingId: string, userId: string, from: string, to: string) {
+    const { rows: [entry] } = await query('SELECT * FROM seeking_entries WHERE id=$1', [seekingId]);
+    if (!entry) throw new NotFoundException('Listing not found');
+    if (entry.user_id !== userId) throw new BadRequestException('Only the owner can edit this listing');
+    if (entry.status === 'matched') throw new BadRequestException('Cannot edit matched listing');
+
+    const dateFrom = new Date(from);
+    const dateTo = new Date(to);
+    if (isNaN(dateFrom.getTime()) || isNaN(dateTo.getTime())) throw new BadRequestException('Invalid date format');
+    if (dateTo <= dateFrom) throw new BadRequestException('End time must be after start time');
+
+    const { rows: overlap } = await query(`
+      SELECT id FROM seeking_entries
+      WHERE user_id=$1 AND id!=$4 AND status IN ('open','has_proposal')
+        AND date_from < $3 AND date_to > $2
+    `, [userId, dateFrom.toISOString(), dateTo.toISOString(), seekingId]);
+    if (overlap.length > 0) throw new ConflictException('Overlapping dates');
+
+    await query('UPDATE seeking_entries SET date_from=$1, date_to=$2 WHERE id=$3', [dateFrom.toISOString(), dateTo.toISOString(), seekingId]);
+    if (entry.status === 'has_proposal') {
+      await query('DELETE FROM proposals WHERE seeking_id=$1', [seekingId]);
+      await query("UPDATE seeking_entries SET status='open' WHERE id=$1", [seekingId]);
+    }
+    return { success: true };
+  }
+
   async requestSpace(sharingId: string, userId: string) {
     const { rows: [target] } = await query('SELECT * FROM sharing_entries WHERE id=$1', [sharingId]);
     if (!target) throw new NotFoundException('Listing not found');

@@ -289,6 +289,7 @@ function AuthFlow({ authScreen, setAuthScreen, onLogin, lang, setLang, theme, se
   );
 }
 
+
 function MainApp({ user, onLogout, lang, setLang, theme, setTheme }: {
   user: ResidentUser; onLogout: () => void;
   lang: Lang; setLang: (l: Lang) => void; theme: Theme; setTheme: (t: Theme) => void;
@@ -586,6 +587,56 @@ function MainApp({ user, onLogout, lang, setLang, theme, setTheme }: {
     } catch (e: any) { showToast(e.message || 'Error'); }
   }, [CU.id, showToast, T, refreshData]);
 
+  const [editModal, setEditModal] = useState<{ id: string; type: 'sharing' | 'seeking'; from: string; to: string } | null>(null);
+  const [editFrom, setEditFrom] = useState('');
+  const [editTo, setEditTo] = useState('');
+  const [editFromTime, setEditFromTime] = useState('08:00');
+  const [editToTime, setEditToTime] = useState('18:00');
+
+  const openEditModal = useCallback((id: string, type: 'sharing' | 'seeking', from: string, to: string) => {
+    const fd = new Date(from);
+    const td = new Date(to);
+    setEditFrom(fd.toISOString().split('T')[0]);
+    setEditTo(td.toISOString().split('T')[0]);
+    setEditFromTime(fd.toTimeString().slice(0, 5));
+    setEditToTime(td.toTimeString().slice(0, 5));
+    setEditModal({ id, type, from, to });
+  }, []);
+
+  const handleEditSave = useCallback(async () => {
+    if (!editModal) return;
+    try {
+      const from = `${editFrom}T${editFromTime}:00`;
+      const to = `${editTo}T${editToTime}:00`;
+      if (editModal.type === 'sharing') {
+        await residentApi.editSharing(editModal.id, from, to);
+      } else {
+        await residentApi.editSeeking(editModal.id, from, to);
+      }
+      showToast(T.save + ' ✓');
+      setEditModal(null);
+      await refreshData();
+    } catch (e: any) { showToast(e.message || 'Error'); }
+  }, [editModal, editFrom, editTo, editFromTime, editToTime, showToast, T, refreshData]);
+
+  const handleDeleteSharing = useCallback(async (id: string) => {
+    if (!confirm(T.confirmDelete)) return;
+    try {
+      await residentApi.deleteSharing(id);
+      showToast(T.deleteListing + ' ✓');
+      await refreshData();
+    } catch (e: any) { showToast(e.message || 'Error'); }
+  }, [showToast, T, refreshData]);
+
+  const handleDeleteSeeking = useCallback(async (id: string) => {
+    if (!confirm(T.confirmDelete)) return;
+    try {
+      await residentApi.deleteSeeking(id);
+      showToast(T.deleteListing + ' ✓');
+      await refreshData();
+    } catch (e: any) { showToast(e.message || 'Error'); }
+  }, [showToast, T, refreshData]);
+
   const markAllRead = useCallback(async () => {
     try {
       await residentApi.markNotificationsRead();
@@ -688,6 +739,28 @@ function MainApp({ user, onLogout, lang, setLang, theme, setTheme }: {
         </div>
       )}
 
+      {editModal && (
+        <div className="edit-modal-overlay" onClick={() => setEditModal(null)}>
+          <div className="edit-modal" onClick={e => e.stopPropagation()}>
+            <h3>{T.editListingTitle}</h3>
+            <div className="field-label">{T.dateFrom}</div>
+            <div className="datetime-row">
+              <input type="date" value={editFrom} onChange={e => setEditFrom(e.target.value)} />
+              <input type="time" value={editFromTime} onChange={e => setEditFromTime(e.target.value)} style={{padding:'10px 12px',borderRadius:10,border:'1px solid var(--border)',fontSize:14,background:'var(--bg)',marginBottom:12}} />
+            </div>
+            <div className="field-label">{T.dateTo}</div>
+            <div className="datetime-row">
+              <input type="date" value={editTo} onChange={e => setEditTo(e.target.value)} />
+              <input type="time" value={editToTime} onChange={e => setEditToTime(e.target.value)} style={{padding:'10px 12px',borderRadius:10,border:'1px solid var(--border)',fontSize:14,background:'var(--bg)',marginBottom:12}} />
+            </div>
+            <div className="edit-modal-btns">
+              <button className="btn-secondary" onClick={() => setEditModal(null)}>{T.cancel}</button>
+              <button className="btn-primary" onClick={handleEditSave}>{T.save}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {screen === 'home' && (
         <div className="screen">
           <div className="home-header">
@@ -703,6 +776,17 @@ function MainApp({ user, onLogout, lang, setLang, theme, setTheme }: {
 
           {showCustomize && (
             <div className="customize-panel">
+              <div className="customize-title">{T.language}</div>
+              <div className="settings-options" style={{marginBottom:12}}>
+                <button className={`settings-opt ${lang === 'pl' ? 'settings-opt-active' : ''}`} onClick={() => setLang('pl')}>🇵🇱 PL</button>
+                <button className={`settings-opt ${lang === 'en' ? 'settings-opt-active' : ''}`} onClick={() => setLang('en')}>🇬🇧 EN</button>
+              </div>
+              <div className="customize-title">{T.theme}</div>
+              <div className="settings-options" style={{marginBottom:12}}>
+                <button className={`settings-opt ${theme === 'light' ? 'settings-opt-active' : ''}`} onClick={() => setTheme('light')}>☀️ {T.themeLight}</button>
+                <button className={`settings-opt ${theme === 'beige' ? 'settings-opt-active' : ''}`} onClick={() => setTheme('beige')}>🏖️ {T.themeBeige}</button>
+                <button className={`settings-opt ${theme === 'dark' ? 'settings-opt-active' : ''}`} onClick={() => setTheme('dark')}>🌙 {T.themeDark}</button>
+              </div>
               <div className="customize-title">{T.customizeView}</div>
               {homeWidgets.map(w => (
                 <label key={w.id} className="customize-row">
@@ -791,7 +875,7 @@ function MainApp({ user, onLogout, lang, setLang, theme, setTheme }: {
 
       {screen === 'board' && (
         <div className="screen">
-          <div className="screen-topbar"><button className="topbar-back" onClick={() => setScreen('home')}>{T.back}</button><h1 className="topbar-title">{T.parkingBoard}</h1><button className="notif-btn notif-btn-sm" onClick={() => { setScreen('notifications'); markAllRead(); }}>🔔{unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}</button></div>
+          <div className="screen-topbar"><button className="topbar-back" onClick={() => setScreen('home')}>{T.back}</button><h1 className="topbar-title">{T.parkingBoard}</h1><div /></div>
           <div className="search-bar">
             <span className="search-icon">🔍</span>
             <input className="search-input" placeholder={T.searchPlaceholder} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
@@ -815,11 +899,11 @@ function MainApp({ user, onLogout, lang, setLang, theme, setTheme }: {
           <div className="card-list">
             {boardTab === 'sharing' ? (filteredSharing.length > 0 ? filteredSharing.map(card => (
               <SwipeItem key={card.id} onSwipe={() => archiveItem(card.id)}>
-                <SharingCard card={card} cu={CU} cuAvatar={avatar} cuName={name} onRequest={handleRequestSpace} onAccept={handleAcceptRequest} onReject={handleRejectRequest} onChat={openChat} lang={lang} T={T} daysLabel={daysLabel} hasActiveReservation={sharing.some(s => s.requestedBy?.userId === CU.id && (s.status === 'pending' || s.status === 'confirmed'))} />
+                <SharingCard card={card} cu={CU} cuAvatar={avatar} cuName={name} onRequest={handleRequestSpace} onAccept={handleAcceptRequest} onReject={handleRejectRequest} onChat={openChat} onEdit={(id, from, to) => openEditModal(id, 'sharing', from, to)} onDelete={handleDeleteSharing} lang={lang} T={T} daysLabel={daysLabel} hasActiveReservation={sharing.some(s => s.requestedBy?.userId === CU.id && (s.status === 'pending' || s.status === 'confirmed'))} />
               </SwipeItem>
             )) : <div className="empty-msg">{T.noListings}</div>) : (filteredSeeking.length > 0 ? filteredSeeking.map(card => (
               <SwipeItem key={card.id} onSwipe={() => archiveItem(card.id)}>
-                <SeekingCard card={card} cu={CU} onOpenProposal={setProposalModal} onAcceptProposal={handleAcceptProposal} onRejectProposal={handleRejectProposal} lang={lang} T={T} daysLabel={daysLabel} />
+                <SeekingCard card={card} cu={CU} onOpenProposal={setProposalModal} onAcceptProposal={handleAcceptProposal} onRejectProposal={handleRejectProposal} onEdit={(id, from, to) => openEditModal(id, 'seeking', from, to)} onDelete={handleDeleteSeeking} lang={lang} T={T} daysLabel={daysLabel} />
               </SwipeItem>
             )) : <div className="empty-msg">{T.noListings}</div>)}
           </div>
@@ -862,7 +946,8 @@ function MainApp({ user, onLogout, lang, setLang, theme, setTheme }: {
 
       {screen === 'notifications' && (
         <div className="screen">
-          <div className="screen-topbar"><button className="topbar-back" onClick={() => setScreen('home')}>{T.back}</button><h1 className="topbar-title">{T.notificationsLabel}</h1><button className="topbar-action" onClick={markAllRead}>{T.markRead}</button></div>
+          <div className="screen-topbar"><button className="topbar-back" onClick={() => setScreen('home')}>{T.back}</button><h1 className="topbar-title">{T.notificationsLabel}</h1><div /></div>
+          <div style={{textAlign:'right',padding:'0 0 8px'}}><button className="topbar-action" onClick={markAllRead}>{T.markRead}</button></div>
           <div className="notif-list">
             {notifications.length === 0 ? <div className="empty-msg">{T.noNotifications}</div> : notifications.map(n => (
               <div key={n.id} className={`notif-item ${!n.read ? 'notif-unread' : ''}`} onClick={() => { if (n.relatedId) { setScreen('board'); setBoardTab(n.relatedId.startsWith('sh') ? 'sharing' : 'seeking'); } }}>
@@ -979,7 +1064,7 @@ function MainApp({ user, onLogout, lang, setLang, theme, setTheme }: {
         const otherChatName = chat.userA === CU.id ? (chat.userBName || '') : (chat.userAName || '');
         return (
           <div className="screen chat-screen">
-            <div className="screen-topbar"><button className="topbar-back" onClick={() => setScreen('messages')}>{T.back}</button><h1 className="topbar-title">{otherChatName || T.anonymousResident}</h1><div className="topbar-space-tag">{chat.spaceCode}</div></div>
+            <div className="screen-topbar"><button className="topbar-back" onClick={() => setScreen('messages')}>{T.back}</button><h1 className="topbar-title">{otherChatName || T.anonymousResident}</h1><div /></div>
             <div className="chat-info-bar">🔒 {T.securityNotice} · {T.messageAboutSpace} {chat.spaceCode}</div>
             <div className="chat-messages">
               {chat.messages.length === 0 && <div className="empty-msg chat-empty">{T.noMessages}</div>}
@@ -1009,10 +1094,12 @@ function MainApp({ user, onLogout, lang, setLang, theme, setTheme }: {
   );
 }
 
-function SharingCard({ card, cu, cuAvatar, cuName, onRequest, onAccept, onReject, onChat, lang, T, daysLabel, hasActiveReservation }: {
+function SharingCard({ card, cu, cuAvatar, cuName, onRequest, onAccept, onReject, onChat, onEdit, onDelete, lang, T, daysLabel, hasActiveReservation }: {
   card: SharingEntry; cu: ResidentUser; cuAvatar: string; cuName: string;
   onRequest: (id: string) => void; onAccept: (id: string) => void; onReject: (id: string) => void;
   onChat?: (otherUserId: string, spaceCode: string, reservationId: string) => void;
+  onEdit?: (id: string, from: string, to: string) => void;
+  onDelete?: (id: string) => void;
   lang: Lang; T: Translations; daysLabel: (n: number) => string; hasActiveReservation?: boolean;
 }) {
   const days = daysBetween(card.from, card.to);
@@ -1021,6 +1108,7 @@ function SharingCard({ card, cu, cuAvatar, cuName, onRequest, onAccept, onReject
   const sameStage = card.stage === cu.stage;
   const displayName = anonName(card.userId, cu.id, card.residentName, T);
   const displayAvatar = anonAvatar(card.userId, cu.id, card.avatar);
+  const canEdit = isOwner && card.status === 'available';
 
   return (
     <div className={`listing-card ${card.status === 'confirmed' ? 'lc-done' : ''}`}>
@@ -1038,6 +1126,12 @@ function SharingCard({ card, cu, cuAvatar, cuName, onRequest, onAccept, onReject
         {card.status === 'available' && !isOwner && sameStage && hasActiveReservation && <div className="lc-info lc-info-pending">🔒 {T.alreadyReserved}</div>}
         {card.status === 'available' && !isOwner && !sameStage && <div className="lc-info lc-info-stage">🔑 {T.otherStage} {card.stage}</div>}
         {card.status === 'available' && isOwner && <div className="lc-info">⏳ {T.waitingForTakers}</div>}
+        {canEdit && (
+          <div className="lc-owner-actions">
+            <button className="lc-btn-edit" onClick={() => onEdit?.(card.id, card.from, card.to)}>✏️ {T.editListing}</button>
+            <button className="lc-btn-delete" onClick={() => onDelete?.(card.id)}>🗑 {T.deleteListing}</button>
+          </div>
+        )}
         {card.status === 'pending' && isOwner && card.requestedBy && (
           <div className="lc-request-box">
             <div className="lc-req-who"><div className="lc-mini-av">{anonAvatar(card.requestedBy.userId, cu.id, card.requestedBy.avatar)}</div><div><div className="lc-req-name">{anonName(card.requestedBy.userId, cu.id, card.requestedBy.userName, T)}</div><div className="lc-req-sub">{T.wantsYourSpace}</div></div></div>
@@ -1058,9 +1152,11 @@ function SharingCard({ card, cu, cuAvatar, cuName, onRequest, onAccept, onReject
   );
 }
 
-function SeekingCard({ card, cu, onOpenProposal, onAcceptProposal, onRejectProposal, lang, T, daysLabel }: {
+function SeekingCard({ card, cu, onOpenProposal, onAcceptProposal, onRejectProposal, onEdit, onDelete, lang, T, daysLabel }: {
   card: SeekingEntry; cu: ResidentUser;
   onOpenProposal: (id: string) => void; onAcceptProposal: (id: string, p: Proposal) => void; onRejectProposal: (id: string, pId: string) => void;
+  onEdit?: (id: string, from: string, to: string) => void;
+  onDelete?: (id: string) => void;
   lang: Lang; T: Translations; daysLabel: (n: number) => string;
 }) {
   const days = daysBetween(card.from, card.to);
@@ -1069,6 +1165,7 @@ function SeekingCard({ card, cu, onOpenProposal, onAcceptProposal, onRejectPropo
   const hasMyProposal = card.proposals.some(p => p.fromUserId === cu.id);
   const displayName = anonName(card.userId, cu.id, card.residentName, T);
   const displayAvatar = anonAvatar(card.userId, cu.id, card.avatar);
+  const canEdit = isOwner && card.status !== 'matched';
 
   return (
     <div className={`listing-card lc-seeking ${card.status === 'matched' ? 'lc-done' : ''}`}>
@@ -1084,6 +1181,12 @@ function SeekingCard({ card, cu, onOpenProposal, onAcceptProposal, onRejectPropo
         {card.status === 'open' && !isOwner && sameStage && <button className="btn-primary btn-orange btn-full" onClick={() => onOpenProposal(card.id)}>{T.proposeYourSpace} {cu.spaceCode}</button>}
         {card.status === 'open' && !isOwner && !sameStage && <div className="lc-info lc-info-stage">🔑 {T.otherStageNeeds} {card.stage}</div>}
         {card.status === 'open' && isOwner && <div className="lc-info">⏳ {T.waitingForProposals}</div>}
+        {canEdit && (
+          <div className="lc-owner-actions">
+            <button className="lc-btn-edit" onClick={() => onEdit?.(card.id, card.from, card.to)}>✏️ {T.editListing}</button>
+            <button className="lc-btn-delete" onClick={() => onDelete?.(card.id)}>🗑 {T.deleteListing}</button>
+          </div>
+        )}
         {card.status === 'has_proposal' && isOwner && card.proposals.map(p => (
           <div key={p.id} className="lc-proposal-card">
             <div className="lc-prop-header"><div className="lc-mini-av">{anonAvatar(p.fromUserId, cu.id, p.fromAvatar)}</div><div><div className="lc-req-name">{anonName(p.fromUserId, cu.id, p.fromUserName, T)}</div><div className="lc-req-sub">{T.proposes} <strong>{p.spaceCode}</strong> · {parkingShort(p.parkingType, lang)}</div></div><span className="lc-private-tag">🔒 {T.private}</span></div>

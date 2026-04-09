@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query, HttpCode, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Put, Body, Param, Query, HttpCode, UseGuards, Req } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ResidentService } from './resident.service';
 import { Public } from '../../common/auth.guard';
@@ -52,6 +52,30 @@ export class ResidentController {
   async addSeeking(@Req() req: Request, @Body() body: { from: string; to: string }) {
     const user = req.user as JwtPayload;
     return this.svc.addSeeking(user.userId, body.from, body.to);
+  }
+
+  @Delete('sharing/:id')
+  async deleteSharing(@Param('id') id: string, @Req() req: Request) {
+    const user = req.user as JwtPayload;
+    return this.svc.deleteSharing(id, user.userId);
+  }
+
+  @Put('sharing/:id')
+  async editSharing(@Param('id') id: string, @Req() req: Request, @Body() body: { from: string; to: string }) {
+    const user = req.user as JwtPayload;
+    return this.svc.editSharing(id, user.userId, body.from, body.to);
+  }
+
+  @Delete('seeking/:id')
+  async deleteSeeking(@Param('id') id: string, @Req() req: Request) {
+    const user = req.user as JwtPayload;
+    return this.svc.deleteSeeking(id, user.userId);
+  }
+
+  @Put('seeking/:id')
+  async editSeeking(@Param('id') id: string, @Req() req: Request, @Body() body: { from: string; to: string }) {
+    const user = req.user as JwtPayload;
+    return this.svc.editSeeking(id, user.userId, body.from, body.to);
   }
 
   @Post('sharing/:id/request')

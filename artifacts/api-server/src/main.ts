@@ -4,13 +4,14 @@ import { NestFactory } from '@nestjs/core';
 import { config } from 'dotenv';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
-import { initDatabase, seedDemoData } from './common/db';
+import { initDatabase, seedDemoData, clearAnnouncements } from './common/db';
 
 config();
 
 async function bootstrap() {
   await initDatabase();
   await seedDemoData();
+  await clearAnnouncements();
 
   const app = await NestFactory.create(AppModule);
 

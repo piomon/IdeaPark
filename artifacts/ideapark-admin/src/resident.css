@@ -339,7 +339,7 @@
   color: var(--text2);
 }
 .bt-tab.bt-active {
-  background: var(--navy); color: #fff; border-color: var(--navy);
+  background: var(--green); color: #fff; border-color: var(--green);
 }
 .bt-count {
   font-size: 11px; font-weight: 700;
@@ -399,9 +399,11 @@
 }
 .lc-time { font-size: 11px; color: var(--text3); }
 .lc-stage {
-  width: 28px; height: 28px; border-radius: 8px;
-  font-size: 12px; font-weight: 800;
-  display: grid; place-items: center;
+  padding: 4px 10px; border-radius: 8px;
+  font-size: 11px; font-weight: 700;
+  white-space: nowrap; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
 }
 .stage-Idea { background: #e8f4ff; color: var(--blue); }
 .stage-Ogrody { background: #e8fff7; color: #00a87b; }
@@ -431,6 +433,36 @@
   font-size: 13px; color: var(--text2); line-height: 1.5;
   border-left: 2px solid var(--border); padding-left: 10px; margin: 0;
 }
+
+.lc-owner-actions {
+  display: flex; gap: 6px; margin-top: 4px;
+}
+.lc-owner-actions button {
+  flex: 1; padding: 8px; border-radius: 10px; font-size: 12px; font-weight: 600;
+  border: 1px solid var(--border); background: var(--bg); color: var(--text2);
+  cursor: pointer; transition: all .15s;
+}
+.lc-owner-actions button:hover { background: var(--card); }
+.lc-btn-edit { color: var(--blue) !important; border-color: var(--blue) !important; }
+.lc-btn-delete { color: #dc2626 !important; border-color: #dc2626 !important; }
+.lc-btn-delete:hover { background: #fef2f2 !important; }
+
+.edit-modal-overlay {
+  position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,.5);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.edit-modal {
+  background: var(--card); border-radius: 16px; padding: 24px; width: 100%; max-width: 380px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.2);
+}
+.edit-modal h3 { font-size: 16px; font-weight: 700; margin: 0 0 16px; }
+.edit-modal .field-label { font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; margin-bottom: 4px; }
+.edit-modal input[type="datetime-local"] {
+  width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
+  font-size: 14px; background: var(--bg); margin-bottom: 12px; box-sizing: border-box;
+}
+.edit-modal-btns { display: flex; gap: 8px; margin-top: 8px; }
+.edit-modal-btns button { flex: 1; }
 
 /* ===== Card Actions ===== */
 .lc-actions { margin-top: 2px; }
@@ -805,7 +837,19 @@
 
 /* ===== Dark mode overrides ===== */
 [data-theme="dark"] .auth-toggle-active {
-  background: rgba(0,200,150,.15); color: var(--green);
+  background: rgba(0,200,150,.2); color: #4ade80;
+}
+[data-theme="dark"] .ats-btn.ats-active {
+  background: rgba(0,200,150,.15); color: #4ade80;
+}
+[data-theme="dark"] .ats-btn.ats-seek.ats-active {
+  background: rgba(255,140,66,.15); color: #fb923c;
+}
+[data-theme="dark"] .bt-tab.bt-active {
+  background: var(--green); color: #fff;
+}
+[data-theme="dark"] .bn-btn.bn-active .bn-label {
+  color: #60a5fa;
 }
 [data-theme="dark"] .confirm-card,
 [data-theme="dark"] .modal-card {
@@ -823,7 +867,13 @@
 
 /* ===== Beige mode overrides ===== */
 [data-theme="beige"] .auth-toggle-active {
+  background: rgba(0,200,150,.12); color: var(--green-d);
+}
+[data-theme="beige"] .ats-btn.ats-active {
   background: rgba(0,200,150,.1); color: var(--green-d);
+}
+[data-theme="beige"] .ats-btn.ats-seek.ats-active {
+  background: rgba(255,140,66,.1); color: var(--orange-d);
 }
 
 /* ===== Swipe to archive ===== */
@@ -927,10 +977,6 @@
 }
 
 /* ===== Stage badges (dynamic names) ===== */
-.lc-stage {
-  font-size: 11px; font-weight: 700; padding: 2px 8px;
-  border-radius: 8px; white-space: nowrap;
-}
 
 /* ===== Session expired notice ===== */
 .auth-session-expired {
