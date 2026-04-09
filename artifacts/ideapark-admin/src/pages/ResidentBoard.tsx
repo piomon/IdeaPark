@@ -217,7 +217,7 @@ function AuthFlow({ authScreen, setAuthScreen, onLogin, lang, setLang, theme, se
               <div className="auth-hint-title">{T.demoAccounts}</div>
               <div className="auth-hint-small" style={{marginBottom:'6px',opacity:.7}}>{T.demoPassword || 'Hasło demo: IdeaPark2026!'}</div>
               <div className="auth-hint-list">
-                {demoUsers.slice(0, 4).map(u => (
+                {demoUsers.map(u => (
                   <button key={u.id} className="auth-demo-btn" onClick={() => handleDemoLogin(u)} disabled={loginLoading}>
                     {u.firstName} {u.lastName} <span className="auth-demo-info">· {T.stage} {u.stage} · {u.spaceCode} · {parkingShort(u.parkingType, lang)}</span>
                   </button>

@@ -96,7 +96,9 @@ export class ResidentService {
   }
 
   async getDemoUsers() {
-    const { rows } = await query("SELECT * FROM residents WHERE id LIKE 'user_%' ORDER BY created_at");
+    const { rows } = await query(
+      "SELECT * FROM residents WHERE id IN ('user_anna','user_tomasz','user_ewa','user_monika') ORDER BY stage, first_name"
+    );
     return rows.map((r: any) => this.mapResident(r));
   }
 
