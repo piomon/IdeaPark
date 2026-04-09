@@ -370,8 +370,8 @@ export class ResidentService {
         spaceCode: r.space_code,
         userA: r.user_a,
         userB: r.user_b,
-        userAName: `${r.a_first} ${r.a_last}`,
-        userBName: `${r.b_first} ${r.b_last}`,
+        userAName: r.user_a === userId ? `${r.a_first} ${r.a_last}` : `${r.a_first} ${(r.a_last || '')[0] || ''}.`,
+        userBName: r.user_b === userId ? `${r.b_first} ${r.b_last}` : `${r.b_first} ${(r.b_last || '')[0] || ''}.`,
         relatedReservationId: r.related_reservation_id,
         messages: msgs.map((m: any) => ({
           id: m.id, fromUserId: m.from_user_id, text: m.text, createdAt: m.created_at,

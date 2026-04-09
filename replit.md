@@ -85,7 +85,7 @@ IdeaPark to demonstracyjny system zarządzania parkingiem pilotażowym dla Osied
 - **Seeking flow**: Szukam miejsca → sąsiad klika "Zaproponuj" (auto z profilu: kod + typ) → szukający Akceptuj/Odrzuć
 - **Blokady biznesowe (server-side)**: (1) nie można zarezerwować swojego miejsca, (2) jedno aktywne udostępnienie per miejsce/daty, (3) jedna aktywna rezerwacja per użytkownik, (4) brak duplikatów propozycji, (5) sprawdzanie etapu
 - **Owner-only guards**: userId pochodzi z JWT tokenu — użytkownik może modyfikować tylko swoje dane
-- **Prawdziwe imiona**: UI pokazuje prawdziwe imiona i nazwiska (anonimizacja usunięta)
+- **RODO / Anonimizacja**: inni użytkownicy widoczni jako "Imię L." (np. Anna K., Tomasz M.) — styl BlaBlaCar/Airbnb; własne dane wyświetlane w pełni
 - **Weryfikacja SMS (OTP)**: demo: kod `123456` (`DEMO_SMS_CODE`)
 - **Ochrona sesji**: sesja wygasa po 30 min bezczynności + auto-logout przy 401 Unauthorized
 - **Wiadomości (czat)**: po rezerwacji strony mogą wymienić wiadomości; przechowywane w PostgreSQL

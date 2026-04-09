@@ -7,7 +7,7 @@ import { residentApi, setAuthToken, getAuthToken, clearAuth } from '../lib/resid
 const STAGES = ['Idea', 'Ogrody', 'Alfa', 'Omega', 'Leo', 'Venus', 'Orion', 'Aurora'] as const;
 type Stage = typeof STAGES[number];
 type ParkingType = 'naziemne' | 'podziemne';
-type AppScreen = 'home' | 'board' | 'add' | 'notifications' | 'profile' | 'settings' | 'messages' | 'chat';
+type AppScreen = 'home' | 'board' | 'add' | 'notifications' | 'profile' | 'settings' | 'messages' | 'chat' | 'regulations';
 type BoardTab = 'sharing' | 'seeking';
 type StageFilter = Stage | 'all';
 
@@ -32,8 +32,11 @@ function clearUser() { localStorage.removeItem(STORAGE_KEY); }
 
 const DEMO_SMS_CODE = '123456';
 
-function anonName(_userId: string, _currentUserId: string, realName: string, _T: { anonymousResident: string }): string {
-  return realName;
+function anonName(userId: string, currentUserId: string, realName: string, _T: { anonymousResident: string }): string {
+  if (userId === currentUserId) return realName;
+  const parts = realName.trim().split(/\s+/);
+  if (parts.length >= 2) return `${parts[0]} ${parts[1][0]}.`;
+  return parts[0] || realName;
 }
 
 function anonAvatar(_userId: string, _currentUserId: string, realAvatar: string): string {
@@ -277,6 +280,7 @@ function AuthFlow({ authScreen, setAuthScreen, onLogin, lang, setLang, theme, se
             )}
             {phoneVerified && <div style={{marginTop:'6px',color:'var(--green)',fontWeight:600,fontSize:'13px'}}>✅ {T.phoneVerified}</div>}
             {regError && <div className="auth-error">{regError}</div>}
+            <p className="reg-terms-note">{T.regAcceptTerms}</p>
             <button className="btn-primary btn-full auth-submit" onClick={handleRegister}>{T.registerBtn}</button>
           </div>
         )}
@@ -900,6 +904,7 @@ function MainApp({ user, onLogout, lang, setLang, theme, setTheme }: {
             <div className="gdpr-text"><strong>{T.securityNotice}</strong><br />{T.gdprInfo}</div>
           </div>
           <button className="btn-settings" onClick={() => setScreen('settings')}>⚙️ {T.settings}</button>
+          <button className="btn-settings" onClick={() => setScreen('regulations')}>{T.regulationsBtn}</button>
           {CU.role === 'admin' && <Link href="/login" className="profile-admin-link">{T.adminPanel}</Link>}
           <button className="btn-logout" onClick={onLogout}>{T.logout}</button>
         </div>
@@ -922,6 +927,26 @@ function MainApp({ user, onLogout, lang, setLang, theme, setTheme }: {
               <button className={`settings-opt ${lang === 'pl' ? 'settings-opt-active' : ''}`} onClick={() => setLang('pl')}>🇵🇱 Polski</button>
               <button className={`settings-opt ${lang === 'en' ? 'settings-opt-active' : ''}`} onClick={() => setLang('en')}>🇬🇧 English</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {screen === 'regulations' && (
+        <div className="screen">
+          <div className="screen-topbar"><button className="topbar-back" onClick={() => setScreen('profile')}>{T.back}</button><h1 className="topbar-title">{T.regulationsTitle}</h1><div /></div>
+          <div className="regulations-content">
+            <div className="reg-header">
+              <div className="reg-logo">🅿️</div>
+              <h2 className="reg-main-title">IdeaPark</h2>
+              <p className="reg-subtitle">{T.regulationsTitle}</p>
+              <p className="reg-date">{T.regulationsLastUpdate}</p>
+            </div>
+            {([1,2,3,4,5,6,7,8,9,10] as const).map(n => (
+              <div key={n} className="reg-section">
+                <h3 className="reg-section-title">{(T as any)[`regSection${n}Title`]}</h3>
+                <div className="reg-section-body">{((T as any)[`regSection${n}`] as string).split('\n').map((line: string, i: number) => <p key={i} className={line.startsWith('   ') ? 'reg-indent' : ''}>{line}</p>)}</div>
+              </div>
+            ))}
           </div>
         </div>
       )}

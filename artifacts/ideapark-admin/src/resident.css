@@ -1047,6 +1047,20 @@
 .vacate-card { border: 2px solid var(--red, #e74c3c); }
 .vacate-icon { font-size: 36px; }
 
+/* ===== Regulations ===== */
+.regulations-content { padding: 0 16px 24px; overflow-y: auto; }
+.reg-header { text-align: center; padding: 24px 0 16px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+.reg-logo { font-size: 40px; margin-bottom: 4px; }
+.reg-main-title { font-size: 22px; font-weight: 700; color: var(--text); margin: 0; }
+.reg-subtitle { font-size: 14px; color: var(--text2); margin: 4px 0 0; font-weight: 500; }
+.reg-date { font-size: 11px; color: var(--text3, #999); margin: 8px 0 0; }
+.reg-section { margin-bottom: 20px; }
+.reg-section-title { font-size: 15px; font-weight: 700; color: var(--accent); margin: 0 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.reg-section-body { font-size: 13px; color: var(--text); line-height: 1.7; }
+.reg-section-body p { margin: 0 0 4px; }
+.reg-indent { padding-left: 20px; }
+.reg-terms-note { font-size: 11px; color: var(--text2); text-align: center; margin: 8px 0 4px; line-height: 1.5; }
+
 /* ===== Responsive: larger screens show phone frame ===== */
 @media (min-width: 520px) {
   .app-wrap {
