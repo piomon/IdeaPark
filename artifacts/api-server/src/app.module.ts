@@ -11,6 +11,7 @@ import { AdminModule } from './modules/admin/admin.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { HealthModule } from './modules/health/health.module';
 import { ResidentModule } from './modules/resident/resident.module';
+import { BackupModule } from './modules/backup/backup.module';
 import { JwtAuthGuard } from './common/auth.guard';
 
 @Module({
@@ -26,6 +27,7 @@ import { JwtAuthGuard } from './common/auth.guard';
     ReportsModule,
     HealthModule,
     ResidentModule,
+    BackupModule,
   ],
   providers: [
     {

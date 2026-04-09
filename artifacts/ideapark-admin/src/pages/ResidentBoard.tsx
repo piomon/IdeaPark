@@ -1008,6 +1008,7 @@ function MainApp({ user, onLogout, lang, setLang, theme, setTheme }: {
             <div className="gdpr-text"><strong>{T.securityNotice}</strong><br />{T.gdprInfo}</div>
           </div>
           <button className="btn-settings" onClick={() => setScreen('settings')}>⚙️ {T.settings}</button>
+          <button className="btn-settings" onClick={() => { setScreen('archive'); loadArchive(); }}>📁 {T.archive}</button>
           <button className="btn-settings" onClick={() => setScreen('regulations')}>{T.regulationsBtn}</button>
           {CU.role === 'admin' && <Link href="/login" className="profile-admin-link">{T.adminPanel}</Link>}
           <button className="btn-logout" onClick={onLogout}>{T.logout}</button>
@@ -1150,7 +1151,6 @@ function MainApp({ user, onLogout, lang, setLang, theme, setTheme }: {
         <button className={`bn-btn ${screen === 'home' ? 'bn-active' : ''}`} onClick={() => setScreen('home')}><span className="bn-icon">🏠</span><span className="bn-label">{T.home}</span></button>
         <button className={`bn-btn ${screen === 'board' ? 'bn-active' : ''}`} onClick={() => setScreen('board')}><span className="bn-icon">🅿️</span><span className="bn-label">{T.boardNav}</span></button>
         <button className={`bn-btn bn-add ${screen === 'add' ? 'bn-active' : ''}`} onClick={() => setScreen('add')}><span className="bn-icon-add">+</span></button>
-        <button className={`bn-btn ${screen === 'archive' ? 'bn-active' : ''}`} onClick={() => { setScreen('archive'); loadArchive(); }}><span className="bn-icon">📁</span><span className="bn-label">{T.archiveNav}</span></button>
         <button className={`bn-btn ${screen === 'messages' || screen === 'chat' ? 'bn-active' : ''}`} onClick={() => setScreen('messages')}><span className="bn-icon">💬</span><span className="bn-label">{T.messagesNav}</span>{unreadMsgCount > 0 && <span className="bn-badge">{unreadMsgCount}</span>}</button>
         <button className={`bn-btn ${screen === 'profile' || screen === 'notifications' || screen === 'settings' ? 'bn-active' : ''}`} onClick={() => setScreen('profile')}><span className="bn-icon">👤</span><span className="bn-label">{T.profileNav}</span>{unreadCount > 0 && <span className="bn-badge">{unreadCount}</span>}</button>
       </nav>
