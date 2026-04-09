@@ -1,0 +1,955 @@
+1. Co to dokładnie jest
+
+IdeaPark to demo systemu parkingowego dla osiedla / wspólnoty mieszkaniowej. Ma trzy interfejsy:
+
+apps/mobile — aplikacja mieszkańca
+apps/api — backend z logiką domenową
+apps/admin — panel zarządcy / operatora
+
+Zakres produktu:
+
+logowanie demo JWT
+dashboard mieszkańca
+lista własnych pojazdów i miejsca
+wyszukiwanie wolnych miejsc
+rezerwowanie miejsca
+udostępnianie własnego miejsca
+dodawanie gości z kodem QR tekstowym
+otwieranie bramy / szlabanu
+panel admina z overview, miejscami, rezerwacjami, gośćmi i raportami
+trwały zapis do pliku JSON, nie do bazy SQL
+2. Stack technologiczny
+Monorepo
+
+Root package.json:
+
+npm workspaces
+workspaces:
+apps/api
+apps/admin
+apps/mobile
+
+Root scripts:
+
+build:api
+build:admin
+typecheck:mobile
+dev:api
+dev:admin
+dev:mobile
+Backend
+NestJS 11
+TypeScript 5.9
+JWT przez jsonwebtoken
+class-validator, class-transformer
+dotenv
+uruchamianie dev: tsx watch
+target ES2022
+moduły Nest bez ORM
+Admin WWW
+Next.js 16
+React 19
+App Router
+client-side fetch
+bez serwerowych akcji biznesowych
+bez global state managera
+Mobile
+Expo 55
+React Native 0.83
+React 19
+expo-haptics
+expo-linear-gradient
+expo-status-bar
+react-native-safe-area-context
+bez React Navigation, bez Redux/Zustand, bez AsyncStorage
+3. Wymagania uruchomieniowe
+
+W README są wskazane:
+
+Node.js 22+
+npm 10+
+
+Uruchamianie:
+
+API: npm run dev:api
+Admin: npm run dev:admin
+Mobile: npm run dev:mobile
+
+Domyślne porty:
+
+API: http://localhost:4000
+Admin: http://localhost:3000
+
+Zmienne środowiskowe:
+
+apps/api/.env
+PORT=4000
+JWT_SECRET=ideapark-demo-secret
+CORS_ORIGIN=http://localhost:3000
+apps/admin/.env.local
+NEXT_PUBLIC_API_URL=http://localhost:4000
+mobile:
+EXPO_PUBLIC_API_URL albo fallback na http://localhost:4000
+
+Ważny detal odtworzeniowy: mobile nie ma osobnego .env.example; adres API jest w praktyce brany z process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:4000'.
+
+4. Struktura repo
+ideapark/
+  package.json
+  apps/
+    api/
+      src/
+        common/
+        modules/
+      data/runtime-db.json
+    admin/
+      app/
+      components/
+      lib/api.ts
+    mobile/
+      App.tsx
+      src/
+        api/
+        context/
+        screens/
+        components/
+        mock.ts
+        types.ts
+        theme.ts
+5. Model domenowy
+
+Backend definiuje dokładnie te typy:
+
+UserRole = 'resident' | 'admin' | 'operator'
+SpaceType = 'private' | 'guest' | 'shared'
+ReservationStatus = 'upcoming' | 'active' | 'completed' | 'cancelled'
+GuestStatus = 'active' | 'used' | 'expired'
+Tenant
+id
+name
+slug
+User
+id
+tenantId
+role
+fullName
+email
+password
+apartmentNumber
+phone
+ownedSpaceIds[]
+vehicleIds[]
+Vehicle
+id
+userId
+plate
+label
+color
+ParkingSpace
+id
+tenantId
+code
+zone
+level
+type
+ownerId?
+isBlocked
+notes?
+ShareWindow
+id
+tenantId
+spaceId
+ownerId
+startsAt
+endsAt
+createdAt
+Reservation
+id
+tenantId
+spaceId
+userId
+vehicleId
+startsAt
+endsAt
+status
+createdAt
+GuestPass
+id
+tenantId
+hostId
+guestName
+plate
+validFrom
+validTo
+qrCode
+status
+createdAt
+GateEvent
+id
+tenantId
+actorId
+gateName
+openedAt
+status: 'opened' | 'failed'
+AuditLog
+id
+tenantId
+actorId
+action
+details: Record<string, unknown>
+createdAt
+AppDatabase
+
+To po prostu:
+
+tenants[]
+users[]
+vehicles[]
+spaces[]
+shareWindows[]
+reservations[]
+guests[]
+gateEvents[]
+auditLogs[]
+6. Seed/demo data
+
+Konta demo z README:
+
+anna@ideapark.local / demo123
+jan@ideapark.local / demo123
+admin@ideapark.local / demo123
+operator@ideapark.local / demo123
+
+Tenant:
+
+tenant_aurora
+Aurora Residence
+aurora-residence
+
+Użytkownicy:
+
+user_anna — resident, ma prywatne miejsce space_p1_014, dwa auta
+user_jan — resident, nie ma własnego miejsca, jedno auto
+user_admin — admin
+user_operator — operator
+
+Pojazdy:
+
+vehicle_anna_1 — WA1234A, BMW iX
+vehicle_anna_2 — WA7777K, Mini Cooper
+vehicle_jan_1 — WX9912N, Tesla Model 3
+
+Miejsca:
+
+space_p1_014 — private, owner user_anna
+space_p1_021 — shared
+space_p1_033 — guest
+space_p2_012 — guest
+space_p2_099 — shared, blocked
+
+Dane startowe:
+
+1 share window Anny
+2 rezerwacje Jana (1 completed, 1 upcoming)
+1 guest pass
+1 gate event
+2 audit logs
+7. Jak działa persistence
+
+To nie jest DB, tylko plik JSON:
+
+ścieżka: apps/api/data/runtime-db.json
+ładowany przez StoreService
+
+Mechanika:
+
+przy starcie tworzy folder data/, jeśli nie istnieje
+jeśli runtime-db.json nie istnieje, zapisuje seed
+jeśli istnieje, ładuje istniejący snapshot
+każda mutacja nadpisuje cały plik
+
+Bardzo ważne niuanse:
+
+w archiwum plik runtime-db.json już istnieje, więc pierwsze uruchomienie czyta jego stan, a nie “czysty” seed
+/reset ustawia dane na seedDatabase
+seedDatabase jest tworzony z const now = new Date() przy imporcie modułu, więc czasy seedów są “zakotwiczone” do momentu startu procesu, nie do chwili resetu
+nie ma transakcji, locków, optimistic concurrency, ani repozytorium DB
+8. Backend – bootstrap i zachowanie globalne
+
+main.ts:
+
+reflect-metadata
+dotenv.config()
+NestFactory.create(AppModule)
+CORS:
+origin z CORS_ORIGIN.split(',')
+fallback ['http://localhost:3000']
+credentials: true
+globalny ValidationPipe:
+whitelist: true
+transform: true
+
+To znaczy:
+
+nieznane pola body są usuwane
+DTO są walidowane
+ale nie ma forbidNonWhitelisted
+9. Autoryzacja i sesja
+Login
+
+POST /auth/login
+body:
+
+{ "email": "string", "password": "string" }
+
+Walidacja:
+
+email musi być emailem
+password min 3 znaki
+
+Jeśli dane są poprawne:
+
+backend tworzy JWT na 12h
+payload tokena to:
+{
+  "id": "...",
+  "tenantId": "...",
+  "email": "...",
+  "fullName": "...",
+  "role": "resident|admin|operator"
+}
+Guard
+
+Wszystkie chronione endpointy używają Authorization: Bearer <token>.
+
+AuthGuard:
+
+sprawdza prefiks Bearer
+jwt.verify(secret)
+wrzuca payload do request.user
+
+Sekret:
+
+process.env.JWT_SECRET ?? 'ideapark-demo-secret'
+Uwaga odtworzeniowa
+brak refresh tokenów
+brak revoke
+brak hashów haseł
+token jest źródłem prawdy dla większości endpointów; guard nie odpytuje DB o aktualność użytkownika
+10. Pełna specyfikacja endpointów
+Publiczne
+GET /health
+zwraca { ok, service, timestamp }
+POST /reset
+publiczny reset bazy demo
+zwraca { ok: true, message: 'Demo database reset' }
+POST /auth/login
+logowanie
+Auth
+GET /auth/me
+Bearer required
+zwraca AuthUser
+Dashboard
+GET /dashboard/summary
+Bearer required
+zwraca:
+headline
+stats[]
+upcomingReservation
+recentActivity[]
+recommendedSpaces[]
+ownedSpaces[]
+vehicles[]
+
+Logika:
+
+upcomingReservation = najbliższa przyszła rezerwacja usera, gdzie endsAt > now i status != cancelled
+recentActivity = 5 najnowszych audit logów w tenant
+recommendedSpaces = pierwsze 3 nieblocked spaces
+ownedSpaces = miejsca, których ownerem jest user, plus ich przyszłe share windows
+Spaces
+GET /spaces?from=&to=
+Bearer required
+default:
+from = now
+to = now + 4h
+zwraca tylko isReservable === true
+GET /spaces/mine
+własne miejsca usera
+każde miejsce rozszerzone o:
+shareWindows[]
+reservations[]
+GET /spaces/:id
+pojedyncze miejsce, enriched
+
+Reguła isReservable:
+
+miejsce nie może być blocked
+nie może mieć kolidującej rezerwacji
+oraz:
+jeśli private: musi mieć overlap shareWindow albo owner = currentUser
+jeśli guest/shared: jest rezerwowalne z definicji
+Shares
+GET /shares/mine
+POST /shares
+
+Body:
+
+{
+  "spaceId": "string",
+  "startsAt": "ISO8601",
+  "endsAt": "ISO8601"
+}
+
+Logika:
+
+jeśli space nie istnieje -> 404
+resident może udostępnić tylko własne miejsce
+admin/operator mogą utworzyć share szerzej, bo ograniczenie jest tylko dla residenta
+zapisuje shareWindow
+dopisuje audit log share.created
+
+Braki:
+
+brak walidacji startsAt < endsAt
+brak wykrywania konfliktów share/share
+brak DELETE / update share
+Reservations
+GET /reservations/mine
+POST /reservations
+DELETE /reservations/:id
+
+Body POST:
+
+{
+  "spaceId": "string",
+  "vehicleId": "string",
+  "startsAt": "ISO8601",
+  "endsAt": "ISO8601"
+}
+
+Logika create:
+
+vehicle musi należeć do usera
+space musi istnieć w tenant
+blocked -> błąd
+overlap z niecancelled reservation -> błąd
+jeśli space private:
+można tylko gdy requested range mieści się w shareWindow
+wyjątek: owner może rezerwować własne miejsce bez share
+status:
+upcoming, gdy startsAt > now
+inaczej active
+zapisuje audit reservation.created
+
+Logika cancel:
+
+resident może anulować tylko swoją rezerwację
+admin/operator mogą anulować dowolną
+zmienia tylko status = 'cancelled'
+dopisuje audit reservation.cancelled
+
+Braki:
+
+brak auto-przejścia upcoming -> active -> completed
+brak walidacji startsAt < endsAt
+Guests
+GET /guests/mine
+POST /guests
+
+Body:
+
+{
+  "guestName": "string>=2",
+  "plate": "string>=4",
+  "validFrom": "ISO8601",
+  "validTo": "ISO8601"
+}
+
+Logika:
+
+tworzy guest pass
+plate.toUpperCase()
+qrCode = IDP-<PLATE_NO_SPACES>-<RANDOM>
+status zawsze active
+audit guest.created
+
+Braki:
+
+brak update statusu na used/expired
+brak walidacji przedziału czasu
+Access
+POST /access/open
+GET /access/history
+
+Body POST:
+
+{ "gateName": "string" }
+
+Logika:
+
+tworzy GateEvent
+status zawsze opened
+audit gate.opened
+zwraca:
+{
+  "success": true,
+  "message": "Brama \"...\" została otwarta",
+  "event": { ... }
+}
+
+GET /access/history
+
+zwraca 10 ostatnich gate events z tenant
+nie filtruje po userze
+Admin
+GET /admin/overview
+GET /admin/spaces
+GET /admin/reservations
+GET /admin/guests
+
+Dostęp:
+
+service wymusza role === admin || operator
+resident dostanie ForbiddenException
+
+/admin/overview zwraca:
+
+tenant
+metrics[]
+recentReservations[]
+recentAudit[]
+
+todayReservations liczone po dacie startsAt względem bieżącego dnia serwera.
+
+Reports
+GET /reports/summary
+
+Zwraca:
+
+tenant
+kpis[]
+monthlyBars[]
+actions[]
+
+Ważny detal:
+
+endpoint jest tylko za AuthGuard, bez sprawdzenia roli admin/operator
+monthlyBars i actions są hardcoded
+utilizationRate to szacunek: Math.min(100, Math.round((reservations / totalSpaces) * 34))
+11. Mobile – dokładne zachowanie
+Shell aplikacji
+
+Nie ma React Navigation. Jest:
+
+AppProvider
+MobileApp
+lokalny state activeTab
+ręcznie przełączane zakładki:
+home
+find
+guests
+access
+profile
+
+Nagłówek pokazuje:
+
+tytuł aktywnej zakładki
+subtitle Aurora Residence
+
+Na dole:
+
+floating tabbar z 5 ikonami
+Logowanie
+
+Jeśli session === null, renderuje OnboardingScreen.
+
+Domyślne pola:
+
+email: anna@ideapark.local
+hasło: demo123
+
+Login flow:
+
+wywołuje login(email, password) z API clienta
+przy błędzie pokazuje komunikat
+
+Bardzo ważne:
+
+mobile ma fallback logowania bez backendu
+jeśli request /auth/login nie przejdzie:
+gdy hasło != demo123 -> błąd
+gdy hasło = demo123:
+jeśli email zawiera jan -> mock session Jana
+inaczej -> mock session Anny
+Globalny stan mobile
+
+AppContext trzyma:
+
+session
+dashboard
+spaces
+reservations
+guests
+gateHistory
+loading
+
+Po loginie robi równolegle:
+
+fetchDashboard
+fetchSpaces
+fetchMine
+fetchReservations
+fetchGuests
+fetchGateHistory
+HomeScreen
+
+Sekcje:
+
+hero z headline i statami
+najbliższa rezerwacja
+szybkie akcje:
+znajdź miejsce
+dodaj gościa
+otwórz bramę
+moje miejsce
+ostatnia aktywność
+
+Jeśli user ma własne miejsce:
+
+pokazuje aktywne udostępnienie albo brak
+przycisk: Udostępnij na najbliższe 4h
+
+createQuickShare(spaceId):
+
+startsAt = now + 1h
+endsAt = now + 5h
+po sukcesie:
+haptic success
+update dashboard.ownedSpaces
+dopisanie recentActivity
+update spaces.currentShareWindow
+FindSpotScreen
+
+Funkcje:
+
+filtry:
+wszystkie
+gościnne
+współdzielone
+prywatne
+preset czasu:
+2h
+4h
+8h
+lista miejsc
+CTA Rezerwuj na Xh
+
+reserveForHours(spaceId, hours):
+
+startsAt = now + 30 min
+endsAt = now + 30 min + hours
+bierze pierwszy pojazd usera
+po sukcesie:
+haptic success
+dopisuje reservation
+ustawia dashboard.upcomingReservation
+dopisuje recentActivity
+ustawia space.isReservable = false
+GuestsScreen
+
+Formularz:
+
+guestName
+plate
+
+Domyślne:
+
+Piotr Lis
+WPR9090K
+
+CTA:
+
+Dodaj gościa na 6h
+
+addGuestForHours(...):
+
+validFrom = now + 30 min
+validTo = now + 30 min + hours
+po sukcesie:
+haptic success
+guest trafia na początek listy
+
+Render listy:
+
+guestName
+plate
+pill status
+box z qrCode
+ważność od-do
+AccessScreen
+
+Predefiniowane bramy:
+
+Brama garażowa A
+Brama garażowa B
+Szlaban gościnny
+
+Flow:
+
+wybór chipem
+przycisk Otwórz: <gate>
+po sukcesie:
+Alert.alert('Sukces', message)
+haptic impact
+event dopisywany do historii
+ProfileScreen
+
+Pokazuje:
+
+avatar
+name
+email
+pills: Mieszkaniec, Aurora Residence
+moje pojazdy
+moje rezerwacje
+wyloguj
+Ważne cechy mobile
+brak trwałej sesji po restarcie aplikacji
+brak AsyncStorage
+brak deep link flow poza scheme: ideapark
+brak push notifications
+brak kamerowego QR — kod jest tekstem
+brak formularzy edycji danych
+brak cancel rezerwacji w UI, mimo że API ma DELETE
+12. Admin WWW – dokładne zachowanie
+Autoryzacja
+
+Login page:
+
+domyślnie admin@ideapark.local / demo123
+demo konta:
+admin
+operator
+
+Po loginie:
+
+zapis do localStorage:
+ideapark_admin_token
+ideapark_admin_user
+
+AuthGate:
+
+tylko sprawdza obecność tokena w localStorage
+nie waliduje tokena z backendem
+
+Logout:
+
+czyści oba klucze
+redirect do /login
+Layout
+
+Sidebar:
+
+Dashboard
+Miejsca
+Rezerwacje
+Goście
+Raporty
+
+Topbar:
+
+title
+subtitle
+badge Tryb pilotowy
+Routes
+/ — landing page
+/login
+/dashboard
+/spaces
+/reservations
+/guests
+/reports
+Dane
+
+Każda strona:
+
+useEffect(() => getX().then(setState), [])
+
+Admin API client:
+
+apiRequest(path, fallback)
+na dowolnym fetch error zwraca mock zamiast błędu
+
+To znaczy:
+
+overview/spaces/reservations/guests/reports mogą działać “na niby”
+login mocka nie ma; login bez API padnie
+Dashboard
+
+Pokazuje:
+
+hero
+4 metric cards
+ostatnie rezerwacje
+ślad audytowy
+Spaces
+
+Tabela:
+
+kod
+strefa
+typ
+właściciel
+udostępnienie
+status
+
+Status:
+
+amber: zablokowane
+emerald: dostępne
+neutral: niedostępne
+Reservations
+
+Tabela:
+
+mieszkaniec
+pojazd
+miejsce
+od
+do
+status
+Guests
+
+Tabela:
+
+gość
+tablica
+gospodarz
+okno wejścia
+QR
+status
+Reports
+
+Widoki:
+
+4 KPI cards
+monthly bars
+rekomendacje zarządcze
+Design admina
+
+To jest ciemny glassmorphism:
+
+tło: granaty + radial gradients
+sidebar 290px
+radiusy 28/22/16
+kolory akcentów:
+emerald
+blue
+amber
+breakpointy:
+do 1100px: siatki spadają do 2/1 kolumn
+do 860px: sidebar znika
+13. Mocki i fallbacki
+
+To jest bardzo ważne, bo bez tego kopia nie będzie wierna.
+
+Mobile
+GET/POST do API mają fallbacki
+login ma fallback, jeśli hasło = demo123
+mocki generują:
+mock session
+mock spaces
+mock reservations
+mock guests
+mock gate history
+mock dashboard
+Admin
+fallback jest na:
+overview
+spaces
+reservations
+guests
+reports
+login nie fallbackuje
+Różnice mock vs real API
+
+Są rozjazdy:
+
+admin mock overview pokazuje liczby typu 96 miejsc, 14 rezerwacji itd.
+real seed backendu ma 5 miejsc, 2 rezerwacje, 1 gościa
+monthlyBars i rekomendacje w reports są w zasadzie makietą biznesową
+fronty nie mają wspólnego shared-contract package, więc typy i dane są duplikowane
+14. Najważniejsze reguły biznesowe
+
+To są rdzeniowe zasady systemu:
+
+Prywatne miejsce
+owner może nim zarządzać
+inni mogą je rezerwować tylko w udostępnionym oknie
+Miejsce shared/guest
+rezerwowalne bez shareWindow
+byle nie blocked i bez konfliktu
+Konflikt rezerwacji
+wykrywany przez overlap zakresów czasu
+Udostępnienie
+tworzy czasowe okno dostępności private space
+Gość
+host tworzy przepustkę z ważnością i tekstowym QR
+Dostęp
+otwarcie bramy zapisuje event i audit
+Admin/operator
+mają dostęp do /admin/*
+mogą anulować cudze rezerwacje
+15. Co trzeba odtworzyć 1:1, żeby kopia była wierna
+
+Jeśli ktoś ma to odbudować dokładnie tak samo, musi zachować:
+
+monorepo npm workspaces
+3 osobne aplikacje
+NestJS API bez bazy SQL
+persistence do jednego JSON-a
+JWT auth 12h
+demo users i tenant Aurora Residence
+seedowane private/shared/guest spaces
+resident app bez React Navigation
+admin panel z localStorage auth
+fallback mocki w obu frontendach
+ręczne odświeżanie stanu przez React state/context
+brak wspólnych shared packages z typami
+reports jako częściowo twardo zaszyta prezentacja
+publiczny /reset
+premium dark admin UI i jasny mobile UI
+16. Najważniejsze luki / ryzyka architektoniczne
+
+To też jest część specyfikacji, bo ktoś odtwarzający powinien wiedzieć, co jest “cechą tego kodu”, a nie bugiem wdrożenia:
+
+brak hashów haseł
+brak refresh tokenów
+brak RBAC guardów poza logiką service
+/reports/summary nie ogranicza roli do admin/operator
+/reset jest publiczny
+brak walidacji start < end
+statusy rezerwacji/gości nie są automatycznie aktualizowane
+wiele modułów tworzy własne instancje StoreService, co grozi niespójnym cache w pamięci
+brak shared contracts między backendem i frontendami
+brak realnej integracji z bramą/szlabanem
+brak Postgresa, Redis, kolejek, 2FA, billingów, webhooków i prawdziwego multi-tenant persistence — README wprost opisuje to jako starter/demo/PoC, nie pełne enterprise wdrożenie.
+17. Stan walidacji
+
+Zweryfikowane w tym środowisku:
+
+API: install + build
+smoke test:
+GET /health
+POST /auth/login
+GET /dashboard/summary
+POST /shares
+POST /reservations
+POST /guests
+POST /access/open
+GET /admin/overview
+Admin: install + build
+Mobile: kompletny source + structural TS check zamiast pełnego Expo install przez problem z tarballami z mirror npm.
+
+Pracowałem na tych plikach: ZIP źródeł, README, VALIDATION.
