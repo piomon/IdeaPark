@@ -95,6 +95,24 @@ export class ResidentService {
     };
   }
 
+  async demoLogin(userId: string) {
+    const { rows } = await query('SELECT * FROM residents WHERE id=$1', [userId]);
+    if (rows.length === 0) throw new UnauthorizedException('User not found');
+    const user = rows[0];
+    const allowed = ['user_anna', 'user_tomasz', 'user_ewa', 'user_monika'];
+    if (!allowed.includes(user.id)) throw new UnauthorizedException('Not a demo account');
+    const payload: JwtPayload = {
+      userId: user.id,
+      firstName: user.first_name,
+      lastName: user.last_name,
+      stage: user.stage,
+      spaceCode: user.space_code,
+      role: user.role,
+    };
+    const token = signToken(payload);
+    return { token, user: this.mapResident(user) };
+  }
+
   async getDemoUsers() {
     const { rows } = await query(
       "SELECT * FROM residents WHERE id IN ('user_anna','user_tomasz','user_ewa','user_monika') ORDER BY stage, first_name"

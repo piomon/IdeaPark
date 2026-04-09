@@ -63,6 +63,8 @@ export const residentApi = {
 
   getDemoUsers: () => request('/demo-users'),
 
+  demoLogin: (userId: string) => request('/demo-login', { method: 'POST', body: JSON.stringify({ userId }) }),
+
   getSharing: () => request('/sharing'),
   getSeeking: () => request('/seeking'),
 

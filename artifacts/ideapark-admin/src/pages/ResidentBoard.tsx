@@ -154,7 +154,7 @@ function AuthFlow({ authScreen, setAuthScreen, onLogin, lang, setLang, theme, se
     setLoginError('');
     setLoginLoading(true);
     try {
-      const result = await residentApi.login(u.firstName, u.lastName, 'IdeaPark2026!');
+      const result = await residentApi.demoLogin(u.id);
       onLogin(result.user, result.token);
     } catch { setLoginError(T.loginError); }
     finally { setLoginLoading(false); }

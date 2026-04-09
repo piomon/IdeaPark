@@ -27,6 +27,12 @@ export class ResidentController {
   }
 
   @Public()
+  @Post('demo-login')
+  async demoLogin(@Body() body: { userId: string }) {
+    return this.svc.demoLogin(body.userId);
+  }
+
+  @Public()
   @Get('demo-users')
   async getDemoUsers() {
     return this.svc.getDemoUsers();
